@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const BackToTop = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -42,57 +43,30 @@ const BackToTop = () => {
 const BlogPost = () => {
   const { id } = useParams();
   const [post, setPost] = useState(null);
+  const { currentUser, addToWatchlist, removeFromWatchlist, getWatchlist } = useAuth();
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Simulating fetching post data
-    const posts = [
-      {
-        id: 1,
-        title: "Getting Started with React",
-        content: `React is a powerful JavaScript library for building user interfaces. It allows you to create reusable UI components that manage their own state.
-
-In this article, we'll cover:
-- Setting up a React project
-- Understanding components
-- State and props
-- Hooks and their usage
-- Best practices for React development`,
-        date: "2025-04-30",
-        author: "Harshdeepsinh Gohil"
-      },
-      {
-        id: 2,
-        title: "Mastering Tailwind CSS",
-        content: `Tailwind CSS is a utility-first CSS framework that can speed up your development process significantly.
-
-Key topics covered:
-- Setting up Tailwind CSS
-- Understanding utility classes
-- Responsive design with Tailwind
-- Custom configuration
-- Performance optimization`,
-        date: "2025-04-29",
-        author: "Harshdeepsinh Gohil"
-      },
-      {
-        id: 3,
-        title: "Modern Web Development",
-        content: `The web development landscape is constantly evolving with new tools and technologies.
-
-We'll explore:
-- Modern JavaScript features
-- Popular frameworks and libraries
-- Build tools and bundlers
-- Development workflows
-- Testing and deployment strategies`,
-        date: "2025-04-28",
-        author: "Harshdeepsinh Gohil"
-      }
-    ];
-
-    const foundPost = posts.find(p => p.id === parseInt(id));
+    // Get posts from localStorage or use empty array if none exist
+    const storedPosts = JSON.parse(localStorage.getItem('blogPosts')) || [];
+    const foundPost = storedPosts.find(p => p.id === parseInt(id));
     setPost(foundPost);
-  }, [id]);
+    
+    // Check if post is in user's watchlist
+    const checkWatchlist = async () => {
+      if (currentUser) {
+        try {
+          const watchlist = await getWatchlist();
+          setIsInWatchlist(watchlist.includes(parseInt(id)));
+        } catch (error) {
+          console.error('Error checking watchlist:', error);
+        }
+      }
+    };
+    
+    checkWatchlist();
+  }, [id, currentUser, getWatchlist]);
 
   if (!post) {
     return (
@@ -136,7 +110,36 @@ We'll explore:
         </div>
 
         <div className="mt-12 pt-6 border-t">
-          <h2 className="text-2xl font-bold mb-4">Share this article</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Share this article</h2>
+            {currentUser && (
+              <button 
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    if (isInWatchlist) {
+                      await removeFromWatchlist(post.id);
+                      setIsInWatchlist(false);
+                    } else {
+                      await addToWatchlist(post.id);
+                      setIsInWatchlist(true);
+                    }
+                  } catch (error) {
+                    console.error('Error updating watchlist:', error);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className={`flex items-center space-x-1 px-4 py-2 rounded ${isInWatchlist ? 'bg-gray-200 hover:bg-gray-300 text-gray-800' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              >
+                <svg className="w-5 h-5" fill={isInWatchlist ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>{isInWatchlist ? 'Saved to Watchlist' : 'Save to Watchlist'}</span>
+              </button>
+            )}
+          </div>
           <div className="flex space-x-4">
             <button className="text-blue-600 hover:text-blue-700">Twitter</button>
             <button className="text-blue-600 hover:text-blue-700">LinkedIn</button>
